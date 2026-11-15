@@ -1,0 +1,54 @@
+# CiteMind 中间件栈 —— docker compose up -d 一键拉起
+# 对应 application-dev.yml 的连接参数：
+#   PostgreSQL(含pgvector): localhost:5432 / citemind_rag / citemind / citemind123456
+#   Elasticsearch:          localhost:9200（本地开发关闭安全认证）
+#   MinIO:                  localhost:9000（控制台 9001）/ citemindminio / citemindminio123
+# 后端 .env 需要与这里的账号密码保持一致
+services:
+  postgres:
+    image: pgvector/pgvector:pg16          # PostgreSQL 16 + pgvector 扩展（向量检索用）
+    container_name: citemind-postgres
+    environment:
+      POSTGRES_DB: citemind_rag
+      POSTGRES_USER: citemind
+      POSTGRES_PASSWORD: citemind123456
+    ports:
+      - "5432:5432"                        # 映射到本机 5432，便于 IDE / 客户端直连
+    volumes:
+      - pg_data:/var/lib/postgresql/data   # 数据持久化（匿名卷或按需改为宿主机目录）
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U citemind -d citemind_rag"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  elasticsearch:
+    image: elastic/elasticsearch:8.14.3    # Docker Hub 官方组织镜像（docker.elastic.co 直连被墙，走国内镜像源）
+    container_name: citemind-es
+    environment:
+      discovery.type: single-node
+      xpack.security.enabled: "false"      # 本地开发关闭认证；IK 分词器后续二开时再加
+      ES_JAVA_OPTS: "-Xms1g -Xmx1g"
+    ports:
+      - "9200:9200"
+    volumes:
+      - es_data:/usr/share/elasticsearch/data
+
+  minio:
+    image: bitnamilegacy/minio:latest      # MinIO 官方已从 Docker Hub/quay 匿名下架社区镜像，Bitnami legacy 版可用
+    container_name: citemind-minio
+    environment:
+      MINIO_ROOT_USER: citemindminio
+      MINIO_ROOT_PASSWORD: citemindminio123
+      MINIO_ACCESS_KEY: citemindminio
+      MINIO_SECRET_KEY: citemindminio123
+    ports:
+      - "9000:9000"                        # S3 API
+      - "9001:9001"                        # 浏览器控制台（若未监听 9001 则以容器日志为准）
+    volumes:
+      - minio_data:/data
+
+volumes:
+  pg_data:
+  es_data:
+  minio_data:
