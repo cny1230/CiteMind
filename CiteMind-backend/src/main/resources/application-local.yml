@@ -24,10 +24,12 @@ spring:
     name: citemind-service
 
   # ── 数据库连接（HikariCP 懒加载：应用启动时不建立连接，首次访问数据库时才连接）──
+  # 默认值与 deploy/docker-compose.yml 中的 citemind-postgres 保持一致：
+  #   库 citemind_rag / 用户 citemind / 密码 citemind123456
   datasource:
     url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:citemind_rag}
     username: ${DB_USERNAME:citemind}
-    password: ${DB_PASSWORD:citemind123}
+    password: ${DB_PASSWORD:citemind123456}
     driver-class-name: org.postgresql.Driver
 
   # ── Spring AI 模型接入（占位值即可启动；真实调用需配置有效 API Key）──

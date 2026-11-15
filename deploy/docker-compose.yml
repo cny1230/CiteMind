@@ -8,6 +8,7 @@ services:
   postgres:
     image: pgvector/pgvector:pg16          # PostgreSQL 16 + pgvector 扩展（向量检索用）
     container_name: citemind-postgres
+    restart: unless-stopped                # 跟随 Docker Desktop 自动拉起，无需每次手动启动
     environment:
       POSTGRES_DB: citemind_rag
       POSTGRES_USER: citemind
@@ -25,6 +26,7 @@ services:
   elasticsearch:
     image: elastic/elasticsearch:8.14.3    # Docker Hub 官方组织镜像（docker.elastic.co 直连被墙，走国内镜像源）
     container_name: citemind-es
+    restart: unless-stopped
     environment:
       discovery.type: single-node
       xpack.security.enabled: "false"      # 本地开发关闭认证；IK 分词器后续二开时再加
@@ -37,6 +39,7 @@ services:
   minio:
     image: bitnamilegacy/minio:latest      # MinIO 官方已从 Docker Hub/quay 匿名下架社区镜像，Bitnami legacy 版可用
     container_name: citemind-minio
+    restart: unless-stopped
     environment:
       MINIO_ROOT_USER: citemindminio
       MINIO_ROOT_PASSWORD: citemindminio123
