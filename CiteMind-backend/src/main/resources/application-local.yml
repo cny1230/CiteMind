@@ -1,0 +1,88 @@
+# ══════════════════════════════════════════════════════════════════
+# CiteMind 后端 · 本地开发配置（application.yml 默认激活 local profile）
+#
+# 设计目标：零中间件也能启动 —— 数据库 / Elasticsearch / MinIO / DashScope
+# 均可缺席（Spring 的懒加载特性 + 各引擎适配器按需装配），应用上下文正常拉起，
+# 可访问 Knife4j 文档页 http://localhost:10001/doc.html 与 Actuator 端点。
+#
+# 需要完整功能时：
+#   1) 用 deploy/docker-compose.yml 启动 PostgreSQL(pgvector) / Elasticsearch / MinIO；
+#   2) 执行 sql/schema.sql 初始化库表；
+#   3) 在 .env 中提供真实的数据库账号与 DASHSCOPE_API_KEY；
+#   4) 将本文件中的占位值替换为 .env 对应变量（IDE 里可用 EnvFile 插件注入）。
+# ══════════════════════════════════════════════════════════════════
+
+project:
+  name: CiteMind-backend
+  version: 1.0.0
+
+server:
+  port: 10001
+
+spring:
+  application:
+    name: citemind-service
+
+  # ── 数据库连接（HikariCP 懒加载：应用启动时不建立连接，首次访问数据库时才连接）──
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:citemind_rag}
+    username: ${DB_USERNAME:citemind}
+    password: ${DB_PASSWORD:citemind123}
+    driver-class-name: org.postgresql.Driver
+
+  # ── Spring AI 模型接入（占位值即可启动；真实调用需配置有效 API Key）──
+  ai:
+    model:
+      chat: dashscope
+      embedding: openai
+    dashscope:
+      api-key: ${DASHSCOPE_API_KEY:your-dashscope-api-key}
+      chat:
+        options:
+          model: qwen-plus
+    openai:
+      api-key: ${OPENAI_API_KEY:your-openai-compatible-api-key}
+      base-url: ${OPENAI_BASE_URL:https://dashscope.aliyuncs.com/compatible-mode}
+      embedding:
+        options:
+          # 与库表结构一致：vector_store 向量列 512 维
+          dimensions: 512
+          model: text-embedding-v3
+          truncate: true
+
+    # ── PGvector 向量存储（复用 PostgreSQL；本地零中间件时关闭启动期建表，
+    #    建表语句见 sql/schema.sql，避免应用启动即尝试连接数据库）──
+    vectorstore:
+      pgvector:
+        dimensions: 512
+        index-type: hnsw
+        distance-type: cosine_distance
+        initialize-schema: false
+
+# ── 认证配置（AuthProperties 强校验：jwt-secret 必须非空，至少 32 字节）──
+citemind:
+  rag:
+    auth:
+      jwt-secret: ${CITEMIND_JWT_SECRET:local-dev-jwt-secret-please-change-32bytes!}
+      issuer: citemind-rag
+      access-token-expire-minutes: 30
+      refresh-token-expire-days: 14
+      refresh-cookie-name: CITEMIND_REFRESH_TOKEN
+      refresh-cookie-secure: false
+
+# ── MinIO：本地默认不配置 endpoint/access-key/secret-key，
+#    MinioStorageService 不会装配，自动降级为 MissingObjectStorageService 兜底实现。
+#    启用对象存储时补充：
+#  minio:
+#    endpoint: ${MINIO_ENDPOINT:http://localhost:9000}
+#    access-key: ${MINIO_ACCESS_KEY:your-minio-access-key}
+#    secret-key: ${MINIO_SECRET_KEY:your-minio-secret-key}
+#    bucket: ${MINIO_BUCKET:citemind-rag-documents}
+
+# ── Elasticsearch：引擎适配器为懒调用（首次检索/写入时才请求 ES），无需启动期配置。
+#    启用关键词检索时补充：
+# elasticsearch:
+#   host: localhost
+#   port: 9200
+#   scheme: http
+#   index-name: citemind_rag_document_chunks
